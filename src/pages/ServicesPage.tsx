@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { ArrowRight, Check } from 'lucide-react';
 import { siteConfig } from '../config/siteConfig';
 import { SeoHead } from '../components/SeoHead';
@@ -8,6 +8,22 @@ import { FinalCtaSection } from '../components/FinalCtaSection';
 
 export function ServicesPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const { hash } = useLocation();
+
+  useEffect(() => {
+    if (!hash) return;
+    const targetId = hash.replace('#', '');
+    if (selectedCategory !== 'all' && selectedCategory !== targetId) {
+      setSelectedCategory('all');
+    }
+    const timer = window.setTimeout(() => {
+      const el = document.getElementById(targetId);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [hash, selectedCategory]);
 
   const visibleServices =
     selectedCategory === 'all'

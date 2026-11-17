@@ -1,3 +1,7 @@
+import heroVisual from '../assets/images/hero_teal_architecture_1794953687542.jpg';
+import solutionsVisual from '../assets/images/solutions_digital_workplace_1794929569428.jpg';
+import insightsVisual from '../assets/images/insights_teal_prisms_1794953687776.jpg';
+
 export type ServiceIconKey =
   | 'sparkles'
   | 'cloud'
@@ -52,6 +56,8 @@ export interface InsightArticle {
   bodyParagraphs: string[];
 }
 
+const baseUrl = import.meta.env.BASE_URL;
+
 export const siteConfig = {
   brand: {
     companyName: 'AASTRA Digital',
@@ -66,7 +72,7 @@ export const siteConfig = {
     serviceArea: 'Serving organizations locally in Saskatchewan and internationally',
     prototypeNotice:
       'Website prototype — brand identity, content, and legal templates are configured for evaluation prior to formal business registration.',
-    faviconPath: '/favicon.svg',
+    faviconPath: `${baseUrl}favicon.svg`,
     accentColors: {
       lightBg: '#F3F3FF',
       lightPrimaryInk: '#031634',
@@ -77,9 +83,9 @@ export const siteConfig = {
   },
 
   assets: {
-    heroVisual: '/src/assets/images/hero_teal_architecture_1794953687542.jpg',
-    solutionsVisual: '/src/assets/images/solutions_digital_workplace_1794929569428.jpg',
-    insightsVisual: '/src/assets/images/insights_teal_prisms_1794953687776.jpg',
+    heroVisual,
+    solutionsVisual,
+    insightsVisual,
   },
 
   contact: {

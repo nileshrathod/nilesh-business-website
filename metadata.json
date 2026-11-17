@@ -2,5 +2,7 @@
   "name": "AASTRA Digital",
   "description": "Technology consulting and digital solutions in AI integration, workflow automation, Microsoft 365, SharePoint, and custom business applications.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
