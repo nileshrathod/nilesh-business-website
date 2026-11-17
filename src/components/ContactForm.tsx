@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle2, Info, Loader2, Mail } from 'lucide-react';
 import { siteConfig } from '../config/siteConfig';
+import { submitFormspreeInquiry } from '../config/formspree';
 
 interface ContactFormProps {
   defaultService?: string;
@@ -17,11 +18,6 @@ interface FormValues {
 }
 
 type FormErrors = Partial<Record<keyof FormValues, string>>;
-
-interface FormspreeErrorPayload {
-  error?: string;
-  errors?: Array<{ message?: string }>;
-}
 
 export function ContactForm({ defaultService = '' }: ContactFormProps) {
   const formEndpoint = siteConfig.contact.formEndpoint;
@@ -138,49 +134,16 @@ export function ContactForm({ defaultService = '' }: ContactFormProps) {
     setStatus('submitting');
     setSubmissionError('');
 
-    const submittedAt = new Date();
-    const submittedAtLocal = new Intl.DateTimeFormat('en-CA', {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-      timeZoneName: 'short',
-    }).format(submittedAt);
-
     try {
-      const response = await fetch(formEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify({
-          _subject: `New Website Inquiry - ${siteConfig.brand.companyName}`,
-          _replyto: values.businessEmail.trim(),
-          _gotcha: values.honeypot,
-          name: values.fullName.trim(),
-          email: values.businessEmail.trim(),
-          company: values.companyName.trim() || 'Not provided',
-          service: values.serviceOfInterest,
-          message: values.projectDetails.trim(),
-          submittedAt: submittedAt.toISOString(),
-          submittedAtLocal,
-          consentConfirmed: 'Yes',
-        }),
+      await submitFormspreeInquiry(formEndpoint, {
+        companyBrandName: siteConfig.brand.companyName,
+        fullName: values.fullName,
+        businessEmail: values.businessEmail,
+        companyName: values.companyName,
+        serviceOfInterest: values.serviceOfInterest,
+        projectDetails: values.projectDetails,
+        honeypot: values.honeypot,
       });
-
-      const data = (await response.json().catch(() => null)) as FormspreeErrorPayload | null;
-
-      if (!response.ok) {
-        const apiDetail =
-          data?.errors
-            ?.map((item) => item.message)
-            .filter(Boolean)
-            .join(' ') || data?.error;
-
-        throw new Error(
-          apiDetail ||
-            `Form service returned an error (HTTP ${response.status}).`
-        );
-      }
 
       setSubmittedReference(values.serviceOfInterest);
       setStatus('success');

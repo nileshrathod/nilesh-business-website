@@ -1,6 +1,7 @@
 import heroVisual from '../assets/images/hero_teal_architecture_1794953687542.jpg';
 import solutionsVisual from '../assets/images/solutions_digital_workplace_1794929569428.jpg';
 import insightsVisual from '../assets/images/insights_teal_prisms_1794953687776.jpg';
+import { getConfiguredFormspreeEndpoint } from './formspree';
 
 export type ServiceIconKey =
   | 'sparkles'
@@ -58,23 +59,6 @@ export interface InsightArticle {
 
 const baseUrl = import.meta.env.BASE_URL;
 
-function resolveFormspreeEndpoint(raw?: string): string {
-  const trimmed = raw?.trim() ?? '';
-  if (
-    !trimmed ||
-    trimmed.includes('your_form_id') ||
-    trimmed.includes('MY_FORMSPREE')
-  ) {
-    return '';
-  }
-  try {
-    const parsed = new URL(trimmed);
-    return parsed.protocol === 'https:' ? parsed.toString() : '';
-  } catch {
-    return '';
-  }
-}
-
 export const siteConfig = {
   brand: {
     companyName: 'AASTRA Digital',
@@ -114,10 +98,10 @@ export const siteConfig = {
     emailPlaceholderLabel: 'Email address placeholder (configure in src/config/siteConfig.ts)',
     location: 'Regina, Saskatchewan, Canada',
     /**
-     * Formspree submission endpoint injected at build time via VITE_FORMSPREE_ENDPOINT.
-     * Example: https://formspree.io/f/xxxxxxxx
+     * Formspree submission endpoint injected via VITE_FORMSPREE_ENDPOINT,
+     * falling back to the project's configured Formspree endpoint when unset.
      */
-    formEndpoint: resolveFormspreeEndpoint(import.meta.env.VITE_FORMSPREE_ENDPOINT),
+    formEndpoint: getConfiguredFormspreeEndpoint(import.meta.env.VITE_FORMSPREE_ENDPOINT),
   },
 
   navigation: {
