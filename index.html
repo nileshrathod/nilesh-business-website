@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AASTRA Digital — Smarter Systems. Better Business.</title>
+    <meta
+      name="description"
+      content="Technology consulting and digital solutions in AI integration, workflow automation, Microsoft 365, SharePoint, and custom applications. Based in Regina, Saskatchewan."
+    />
+    <meta property="og:title" content="AASTRA Digital — Smarter Systems. Better Business." />
+    <meta
+      property="og:description"
+      content="Practical, secure, and scalable digital solutions across AI, automation, Microsoft 365, SharePoint, and custom software."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="AASTRA Digital" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="AASTRA Digital — Smarter Systems. Better Business." />
+    <meta
+      name="twitter:description"
+      content="Practical, secure, and scalable digital solutions across AI, automation, Microsoft 365, SharePoint, and custom software."
+    />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Barlow:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      (function () {
+        try {
+          var storageKey = 'aastra-theme';
+          var stored = localStorage.getItem(storageKey);
+          var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var theme = stored === 'light' || stored === 'dark' ? stored : (prefersDark ? 'dark' : 'light');
+          if (theme === 'dark') {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+          document.documentElement.style.colorScheme = theme;
+        } catch (e) {}
+      })();
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "ProfessionalService",
+        "name": "AASTRA Digital",
+        "description": "Technology consulting and digital solutions focused on AI integration, workflow automation, Microsoft 365, SharePoint, Power Platform, and custom business applications.",
+        "areaServed": ["Regina", "Saskatchewan", "Canada", "International"],
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "Regina",
+          "addressRegion": "SK",
+          "addressCountry": "CA"
+        },
+        "telephone": "+1-639-997-9925",
+        "email": "njrathod@gmail.com"
+      }
+    </script>
+  </head>
+  <body class="bg-[#F3F3FF] text-[#031634] antialiased dark:bg-black dark:text-white">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
