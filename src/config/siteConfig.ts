@@ -58,6 +58,23 @@ export interface InsightArticle {
 
 const baseUrl = import.meta.env.BASE_URL;
 
+function resolveFormspreeEndpoint(raw?: string): string {
+  const trimmed = raw?.trim() ?? '';
+  if (
+    !trimmed ||
+    trimmed.includes('your_form_id') ||
+    trimmed.includes('MY_FORMSPREE')
+  ) {
+    return '';
+  }
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === 'https:' ? parsed.toString() : '';
+  } catch {
+    return '';
+  }
+}
+
 export const siteConfig = {
   brand: {
     companyName: 'AASTRA Digital',
@@ -97,11 +114,10 @@ export const siteConfig = {
     emailPlaceholderLabel: 'Email address placeholder (configure in src/config/siteConfig.ts)',
     location: 'Regina, Saskatchewan, Canada',
     /**
-     * Optional webhook or serverless form endpoint (e.g., Azure Static Web Apps /api/contact,
-     * Formspree, or Web3Forms). When empty, the contact form runs in clearly labelled
-     * Prototype Demo Mode without transmitting or storing personal data.
+     * Formspree submission endpoint injected at build time via VITE_FORMSPREE_ENDPOINT.
+     * Example: https://formspree.io/f/xxxxxxxx
      */
-    formEndpoint: '',
+    formEndpoint: resolveFormspreeEndpoint(import.meta.env.VITE_FORMSPREE_ENDPOINT),
   },
 
   navigation: {

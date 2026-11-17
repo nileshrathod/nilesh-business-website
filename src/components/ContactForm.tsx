@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AlertCircle, CheckCircle2, Info, Loader2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Info, Loader2, Mail } from 'lucide-react';
 import { siteConfig } from '../config/siteConfig';
 
 interface ContactFormProps {
@@ -13,11 +13,20 @@ interface FormValues {
   serviceOfInterest: string;
   projectDetails: string;
   consent: boolean;
+  honeypot: string;
 }
 
 type FormErrors = Partial<Record<keyof FormValues, string>>;
 
+interface FormspreeErrorPayload {
+  error?: string;
+  errors?: Array<{ message?: string }>;
+}
+
 export function ContactForm({ defaultService = '' }: ContactFormProps) {
+  const formEndpoint = siteConfig.contact.formEndpoint;
+  const isFormConfigured = Boolean(formEndpoint);
+
   const [values, setValues] = useState<FormValues>({
     fullName: '',
     businessEmail: '',
@@ -25,6 +34,7 @@ export function ContactForm({ defaultService = '' }: ContactFormProps) {
     serviceOfInterest: defaultService || siteConfig.services[0]?.title || '',
     projectDetails: '',
     consent: false,
+    honeypot: '',
   });
 
   const [errors, setErrors] = useState<FormErrors>({});
@@ -51,10 +61,12 @@ export function ContactForm({ defaultService = '' }: ContactFormProps) {
       nextErrors.serviceOfInterest = 'Please select a service of interest.';
     }
     if (!values.projectDetails.trim() || values.projectDetails.trim().length < 15) {
-      nextErrors.projectDetails = 'Please share a brief overview of your goals (at least 15 characters).';
+      nextErrors.projectDetails =
+        'Please share a brief overview of your goals (at least 15 characters).';
     }
     if (!values.consent) {
-      nextErrors.consent = 'Please confirm that you understand how this prototype handles your inquiry.';
+      nextErrors.consent =
+        'Please confirm your consent so we can respond to your inquiry.';
     }
     return nextErrors;
   };
@@ -68,10 +80,37 @@ export function ContactForm({ defaultService = '' }: ContactFormProps) {
         return copy;
       });
     }
+    if (status === 'error') {
+      setStatus('idle');
+      setSubmissionError('');
+    }
+  };
+
+  const buildFallbackMailtoHref = (): string => {
+    const subject = encodeURIComponent(
+      `New Website Inquiry - ${siteConfig.brand.companyName}`
+    );
+    const bodyLines = [
+      `Name: ${values.fullName.trim() || 'Not provided'}`,
+      `Business Email: ${values.businessEmail.trim() || 'Not provided'}`,
+      `Company: ${values.companyName.trim() || 'Not provided'}`,
+      `Service of Interest: ${values.serviceOfInterest || 'Not specified'}`,
+      '',
+      'Project Details:',
+      values.projectDetails.trim() || 'Not provided',
+    ];
+    return `mailto:${siteConfig.contact.email}?subject=${subject}&body=${encodeURIComponent(
+      bodyLines.join('\n')
+    )}`;
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+
+    if (status === 'submitting') {
+      return;
+    }
+
     const validationErrors = validate();
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
@@ -79,27 +118,68 @@ export function ContactForm({ defaultService = '' }: ContactFormProps) {
       return;
     }
 
+    if (!isFormConfigured) {
+      setStatus('error');
+      setSubmissionError(
+        'Online form delivery is not configured yet (missing VITE_FORMSPREE_ENDPOINT). No email was sent. Please email us directly or call to complete your inquiry.'
+      );
+      return;
+    }
+
+    // If the hidden honeypot field was populated by an automated bot, decline submission silently.
+    if (values.honeypot.trim().length > 0) {
+      setStatus('error');
+      setSubmissionError(
+        'Submission could not be verified. Please contact us directly by email or telephone.'
+      );
+      return;
+    }
+
     setStatus('submitting');
     setSubmissionError('');
 
+    const submittedAt = new Date();
+    const submittedAtLocal = new Intl.DateTimeFormat('en-CA', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZoneName: 'short',
+    }).format(submittedAt);
+
     try {
-      if (siteConfig.contact.formEndpoint) {
-        const response = await fetch(siteConfig.contact.formEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fullName: values.fullName.trim(),
-            businessEmail: values.businessEmail.trim(),
-            companyName: values.companyName.trim(),
-            serviceOfInterest: values.serviceOfInterest,
-            projectDetails: values.projectDetails.trim(),
-          }),
-        });
-        if (!response.ok) {
-          throw new Error('Unable to deliver inquiry to the configured endpoint.');
-        }
-      } else {
-        await new Promise((resolve) => setTimeout(resolve, 350));
+      const response = await fetch(formEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          _subject: `New Website Inquiry - ${siteConfig.brand.companyName}`,
+          _replyto: values.businessEmail.trim(),
+          _gotcha: values.honeypot,
+          name: values.fullName.trim(),
+          email: values.businessEmail.trim(),
+          company: values.companyName.trim() || 'Not provided',
+          service: values.serviceOfInterest,
+          message: values.projectDetails.trim(),
+          submittedAt: submittedAt.toISOString(),
+          submittedAtLocal,
+          consentConfirmed: 'Yes',
+        }),
+      });
+
+      const data = (await response.json().catch(() => null)) as FormspreeErrorPayload | null;
+
+      if (!response.ok) {
+        const apiDetail =
+          data?.errors
+            ?.map((item) => item.message)
+            .filter(Boolean)
+            .join(' ') || data?.error;
+
+        throw new Error(
+          apiDetail ||
+            `Form service returned an error (HTTP ${response.status}).`
+        );
       }
 
       setSubmittedReference(values.serviceOfInterest);
@@ -111,11 +191,16 @@ export function ContactForm({ defaultService = '' }: ContactFormProps) {
         serviceOfInterest: siteConfig.services[0]?.title || '',
         projectDetails: '',
         consent: false,
+        honeypot: '',
       });
-    } catch {
+    } catch (err) {
+      const detail =
+        err instanceof Error && err.message
+          ? err.message
+          : 'Network error while reaching the form service.';
       setStatus('error');
       setSubmissionError(
-        'Submission could not be completed. Please try again or reach out directly by phone.'
+        `We could not send your inquiry (${detail}). Your entered details have been preserved—please try again, or contact us directly by email or phone.`
       );
     }
   };
@@ -134,38 +219,32 @@ export function ContactForm({ defaultService = '' }: ContactFormProps) {
           />
           <div className="space-y-3">
             <h3 className="font-display text-lg font-semibold text-[#031634] dark:text-white">
-              {siteConfig.contact.formEndpoint
-                ? 'Inquiry Submitted'
-                : 'Prototype Form Validation Complete (Demo Mode)'}
+              Inquiry Sent
             </h3>
             <p className="text-sm leading-relaxed text-[#031634]/80 dark:text-zinc-300">
-              {siteConfig.contact.formEndpoint
-                ? `Thank you for your inquiry regarding ${submittedReference}. Your message has been sent.`
-                : `Your form input for "${submittedReference}" passed validation. Because this website is currently running in prototype mode without a connected email service, no email was transmitted and no personal information was saved in browser storage.`}
+              Thank you for contacting {siteConfig.brand.companyName}. Your inquiry regarding{' '}
+              <span className="font-medium text-[#031634] dark:text-white">
+                {submittedReference}
+              </span>{' '}
+              has been submitted and an email notification has been triggered.
             </p>
-            {!siteConfig.contact.formEndpoint && (
-              <p className="text-xs leading-relaxed text-[#031634]/70 dark:text-zinc-400">
-                To connect a live backend later, add an endpoint URL in{' '}
-                <code className="rounded bg-white px-1.5 py-0.5 font-mono text-[#031634] dark:bg-black dark:text-zinc-200">
-                  siteConfig.contact.formEndpoint
-                </code>{' '}
-                or email{' '}
-                <a
-                  href={`mailto:${siteConfig.contact.email}`}
-                  className="font-medium text-[#00876A] underline dark:text-[#00CBA0]"
-                >
-                  {siteConfig.contact.email}
-                </a>{' '}
-                or call{' '}
-                <a
-                  href={siteConfig.contact.phoneHref}
-                  className="font-medium text-[#00876A] underline dark:text-[#00CBA0]"
-                >
-                  {siteConfig.contact.phone}
-                </a>
-                .
-              </p>
-            )}
+            <p className="text-xs leading-relaxed text-[#031634]/70 dark:text-zinc-400">
+              Need to add urgent context? Email{' '}
+              <a
+                href={`mailto:${siteConfig.contact.email}`}
+                className="font-medium text-[#00876A] underline dark:text-[#00CBA0]"
+              >
+                {siteConfig.contact.email}
+              </a>{' '}
+              or call{' '}
+              <a
+                href={siteConfig.contact.phoneHref}
+                className="font-medium text-[#00876A] underline dark:text-[#00CBA0]"
+              >
+                {siteConfig.contact.phone}
+              </a>
+              .
+            </p>
             <button
               type="button"
               onClick={() => setStatus('idle')}
@@ -181,28 +260,78 @@ export function ContactForm({ defaultService = '' }: ContactFormProps) {
 
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-5">
-      {!siteConfig.contact.formEndpoint && (
-        <div className="flex items-start gap-3 rounded-xl border border-[#031634]/10 bg-[#F3F3FF] p-4 text-xs leading-relaxed text-[#031634]/80 dark:border-white/10 dark:bg-black dark:text-zinc-300">
-          <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#00876A] dark:text-[#00CBA0]" aria-hidden="true" />
-          <p>
-            <span className="font-semibold text-[#031634] dark:text-white">
-              Prototype Demo Notice:
-            </span>{' '}
-            This form demonstrates full validation and submission states without storing personal data in browser storage or sending live emails. Connect an API endpoint in{' '}
-            <code className="font-mono">siteConfig.ts</code> when deploying to production.
-          </p>
+      {!isFormConfigured && (
+        <div className="flex items-start gap-3 rounded-xl border border-[#FFC830]/60 bg-[#FFC830]/15 p-4 text-xs leading-relaxed text-[#031634] dark:border-[#FFC830]/35 dark:bg-[#FFC830]/10 dark:text-zinc-200">
+          <Info
+            className="mt-0.5 h-4 w-4 shrink-0 text-[#9A7100] dark:text-[#FFC830]"
+            aria-hidden="true"
+          />
+          <div className="space-y-1.5">
+            <p>
+              <span className="font-semibold">Form Endpoint Setup Required:</span>{' '}
+              Set <code className="font-mono">VITE_FORMSPREE_ENDPOINT</code> in your build environment to enable automated Formspree email notifications.
+            </p>
+            <p>
+              Until configured, please send inquiries directly to{' '}
+              <a
+                href={`mailto:${siteConfig.contact.email}`}
+                className="font-semibold underline hover:text-[#00876A] dark:hover:text-[#00CBA0]"
+              >
+                {siteConfig.contact.email}
+              </a>{' '}
+              or call{' '}
+              <a
+                href={siteConfig.contact.phoneHref}
+                className="font-semibold underline hover:text-[#00876A] dark:hover:text-[#00CBA0]"
+              >
+                {siteConfig.contact.phone}
+              </a>
+              .
+            </p>
+          </div>
         </div>
       )}
 
       {status === 'error' && submissionError && (
         <div
           role="alert"
-          className="flex items-start gap-2.5 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300"
+          className="space-y-3 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200"
         >
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>{submissionError}</span>
+          <div className="flex items-start gap-2.5">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>{submissionError}</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 pl-6 text-xs">
+            <a
+              href={buildFallbackMailtoHref()}
+              className="inline-flex items-center gap-1.5 rounded-md border border-red-300 bg-white px-3 py-1.5 font-semibold text-red-900 transition-colors hover:bg-red-100 dark:border-red-800 dark:bg-black dark:text-red-200 dark:hover:bg-red-950"
+            >
+              <Mail className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>Open in Email App ({siteConfig.contact.email})</span>
+            </a>
+            <a
+              href={siteConfig.contact.phoneHref}
+              className="font-semibold underline"
+            >
+              Call {siteConfig.contact.phone}
+            </a>
+          </div>
         </div>
       )}
+
+      {/* Formspree honeypot field for automated spam filtering */}
+      <div className="sr-only" aria-hidden="true">
+        <label htmlFor="contact-website-field">Leave this field empty</label>
+        <input
+          id="contact-website-field"
+          name="_gotcha"
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+          value={values.honeypot}
+          onChange={(e) => handleChange('honeypot', e.target.value)}
+        />
+      </div>
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <div>
@@ -230,7 +359,10 @@ export function ContactForm({ defaultService = '' }: ContactFormProps) {
             }`}
           />
           {errors.fullName && (
-            <p id="error-fullName" className="mt-1.5 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+            <p
+              id="error-fullName"
+              className="mt-1.5 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400"
+            >
               <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span>{errors.fullName}</span>
             </p>
@@ -262,7 +394,10 @@ export function ContactForm({ defaultService = '' }: ContactFormProps) {
             }`}
           />
           {errors.businessEmail && (
-            <p id="error-businessEmail" className="mt-1.5 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+            <p
+              id="error-businessEmail"
+              className="mt-1.5 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400"
+            >
               <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span>{errors.businessEmail}</span>
             </p>
@@ -276,7 +411,10 @@ export function ContactForm({ defaultService = '' }: ContactFormProps) {
             htmlFor="contact-companyName"
             className="block text-sm font-medium text-[#031634] dark:text-zinc-200"
           >
-            Company name <span className="text-xs font-normal text-[#031634]/55 dark:text-zinc-500">(optional)</span>
+            Company name{' '}
+            <span className="text-xs font-normal text-[#031634]/55 dark:text-zinc-500">
+              (optional)
+            </span>
           </label>
           <input
             id="contact-companyName"
@@ -321,7 +459,10 @@ export function ContactForm({ defaultService = '' }: ContactFormProps) {
             </option>
           </select>
           {errors.serviceOfInterest && (
-            <p id="error-service" className="mt-1.5 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+            <p
+              id="error-service"
+              className="mt-1.5 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400"
+            >
               <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span>{errors.serviceOfInterest}</span>
             </p>
@@ -353,7 +494,10 @@ export function ContactForm({ defaultService = '' }: ContactFormProps) {
           }`}
         />
         {errors.projectDetails && (
-          <p id="error-projectDetails" className="mt-1.5 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+          <p
+            id="error-projectDetails"
+            className="mt-1.5 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400"
+          >
             <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span>{errors.projectDetails}</span>
           </p>
@@ -376,11 +520,14 @@ export function ContactForm({ defaultService = '' }: ContactFormProps) {
             htmlFor="contact-consent"
             className="text-xs leading-relaxed text-[#031634]/75 dark:text-zinc-400"
           >
-            I acknowledge that this prototype form validates inquiries locally without storing personal information in browser storage.
+            I consent to {siteConfig.brand.companyName} using the information submitted in this form to respond to my inquiry.
           </label>
         </div>
         {errors.consent && (
-          <p id="error-consent" className="mt-1.5 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+          <p
+            id="error-consent"
+            className="mt-1.5 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400"
+          >
             <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span>{errors.consent}</span>
           </p>
@@ -391,12 +538,13 @@ export function ContactForm({ defaultService = '' }: ContactFormProps) {
         <button
           type="submit"
           disabled={status === 'submitting'}
+          aria-busy={status === 'submitting'}
           className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-[#00CBA0] px-6 py-2.5 text-sm font-semibold text-[#031634] transition-colors duration-150 hover:bg-[#00B58E] disabled:cursor-not-allowed disabled:opacity-70 dark:text-black dark:hover:bg-[#19DDB3]"
         >
           {status === 'submitting' ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              <span>Validating Inquiry...</span>
+              <span>Sending Inquiry...</span>
             </>
           ) : (
             <span>Submit Inquiry</span>

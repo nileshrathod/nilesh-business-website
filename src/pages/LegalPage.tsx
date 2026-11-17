@@ -41,10 +41,10 @@ export function LegalPage({ type }: LegalPageProps) {
             <div className="mt-8 space-y-6 text-sm leading-relaxed text-[#031634]/80 dark:text-zinc-300">
               <section className="space-y-2">
                 <h2 className="font-display text-lg font-semibold text-[#031634] dark:text-white">
-                  1. Prototype Data Handling
+                  1. Inquiry Data & Browser Storage
                 </h2>
                 <p>
-                  In its current prototype state, this website does not transmit contact form entries to an external email server or store submitted personal information in browser storage. Only your selected light/dark display preference is saved locally via <code className="font-mono text-xs">localStorage</code>.
+                  When the contact form endpoint is configured, inquiry details entered on the Contact page are transmitted via HTTPS to Formspree solely to deliver email notifications for responding to your request. This website does not store submitted personal information in browser storage; <code className="font-mono text-xs">localStorage</code> is used only to remember your light or dark display preference.
                 </p>
               </section>
 
